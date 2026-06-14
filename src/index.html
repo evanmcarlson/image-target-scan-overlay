@@ -5,16 +5,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>A-Frame: Image Target Stickers</title>
-  <meta itemprop="name" content="A-Frame: Image Target Stickers">
-  <meta name="twitter:title" content="A-Frame: Image Target Stickers">
-  <meta property="og:title" content="A-Frame: Image Target Stickers">
-  <meta property="og:site_name" content="A-Frame: Image Target Stickers">
-  <meta name="description" content="I made AR stickers for my friends&#x27; birthday. Happy birthday Chanel &amp; Diana!">
-  <meta itemprop="description" content="I made AR stickers for my friends&#x27; birthday. Happy birthday Chanel &amp; Diana!">
-  <meta property="og:description" content="I made AR stickers for my friends&#x27; birthday. Happy birthday Chanel &amp; Diana!">
-  <meta name="twitter:description" content="I made AR stickers for my friends&#x27; birthday. Happy birthday Chanel &amp; Diana!">
-  <meta property="og:image" content="https://evanmcarlson.github.io/aframe-image-target-stickers/assets/demo.png">
+  <title>Image Target Scan Overlay</title>
+  <meta itemprop="name" content="Image Target Scan Overlay">
+  <meta name="twitter:title" content="Image Target Scan Overlay">
+  <meta property="og:title" content="Image Target Scan Overlay">
+  <meta property="og:site_name" content="Image Target Scan Overlay">
+  <meta name="description" content="Scan-and-lock UI overlay for 8th Wall + A-Frame image target experiences.">
+  <meta itemprop="description" content="Scan-and-lock UI overlay for 8th Wall + A-Frame image target experiences.">
+  <meta property="og:description" content="Scan-and-lock UI overlay for 8th Wall + A-Frame image target experiences.">
+  <meta name="twitter:description" content="Scan-and-lock UI overlay for 8th Wall + A-Frame image target experiences.">
+  <meta property="og:image" content="https://evanmcarlson.github.io/image-target-scan-overlay/assets/demo.png">
 
   <script crossorigin="anonymous" src="./external/scripts/8frame-1.3.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@8thwall/xrextras@1/dist/xrextras.js" crossorigin="anonymous"></script>
@@ -24,6 +24,60 @@
 
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <script src="https://unpkg.com/aframe-hologram-shader"></script>
+
+  <style>
+    .scan-bracket {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke: #E5E5E5;
+      transition: stroke 0.15s;
+    }
+    #scan-line {
+      stroke: #6FCF7C;
+      stroke-width: 4;
+      stroke-linecap: round;
+    }
+    #scan-svg.breathing {
+      animation: breathe 1.8s ease-in-out infinite;
+      transform-origin: 50% 50%;
+    }
+    @keyframes breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.035); }
+    }
+    #scan-status-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 90px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 20px;
+      background: rgba(0, 0, 0, 0.55);
+    }
+    #scan-thumb {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      flex-shrink: 0;
+    }
+    #scan-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #scan-status-text {
+      color: #F1EFE8;
+      font-size: 15px;
+      font-weight: 500;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+  </style>
 
 </head>
 
@@ -40,7 +94,7 @@
   landing-page
 >
   <a-assets>
-    <img id="img" src="./assets/transparent.png" />
+    <img id="img" src="./assets/image_original.png" />
   </a-assets>
 
   <a-camera
@@ -56,16 +110,25 @@
 
   <!-- Note: "name:" must be set to the name of the image target uploaded to the 8th Wall Console -->
   <xrextras-named-image-target name="image">
-    <!-- Add a child entity of the image target. -->
-    <a-circle color="black" radius="0.46"></a-circle>
-    <a-plane
-      src="#img"
-      material="transparent: true; shader: hologram; numGlitchBars: 20"
-      position="0 0 0.5"
-      animation__spin="property: rotation; from: 0 0 0; to: 0 0 360; loop: true; easing: linear; dur: 10000"
-    ></a-plane>
+    <a-plane src="#img"></a-plane>
   </xrextras-named-image-target>
 </a-scene>
+
+<div id="scan-overlay" style="position:fixed; inset:0; pointer-events:none; z-index:1000;">
+  <svg id="scan-svg" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:100%;">
+    <path id="bracket-tl" class="scan-bracket"/>
+    <path id="bracket-tr" class="scan-bracket"/>
+    <path id="bracket-br" class="scan-bracket"/>
+    <path id="bracket-bl" class="scan-bracket"/>
+    <line id="scan-line" style="display:none;"/>
+  </svg>
+  <div id="scan-status-bar">
+    <div id="scan-thumb">
+      <img id="scan-thumb-img" src="./assets/image_thumbnail.png" alt="target"/>
+    </div>
+    <div id="scan-status-text">Looking for image</div>
+  </div>
+</div>
 
 </body>
 

@@ -118,6 +118,7 @@ const config = {
   mode: 'production',
   context: srcPath,
   devServer: {
+    allowedHosts: ['.ngrok-free.dev'],
     open: false,
     compress: true,
     hot: true,

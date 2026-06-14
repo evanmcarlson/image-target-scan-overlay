@@ -1,99 +1,75 @@
-# A-Frame: Image Target Stickers
+# image-target-scan-overlay
 
-I made AR Pins for my friends' birthday - happy birthday Chanel & Diana!
+A scan-and-lock UI overlay for 8th Wall + A-Frame image target experiences. When the camera finds the target image, corner brackets animate from a centered reticle onto the tracked quad, a scan line sweeps across it, and the experience confirms. No AR content required beyond that beat.
 
-### Make it your own
+## How it works
 
-1. Create a design or logo digitally.
-2. Upload the design as an image target.
-3. Create a transparent version of the design.
+Three visual states, driven by 8th Wall's image tracking events:
 
-![transparent image target design](./src/assets/transparent.png)
+**Searching** — 4 corner brackets breathe gently at the center of the screen. Bottom bar shows "Looking for image" with a thumbnail of the target.
 
-4. Use the transparent image as a texture on `<a-plane>`.
+**Found / locking** — on `xrimagefound`, brackets animate from the reticle to wrap the tracked image (450ms ease-out-back, slight overshoot). Color shifts from grey to green. Fires `navigator.vibrate(10)` and a short Web Audio chime at the start.
+
+**Confirmed** — a line sweeps across the tracked quad (800ms), then the status bar reads "Found ✓ image" and the brackets pulse once. Terminal state — `xrimagelost` is ignored from this point on.
+
+The brackets are never destroyed and recreated between states — the same 4 SVG elements move, which is what makes the lock feel like a catch rather than a UI swap.
+
+### Perspective-aware corners
+
+Because the target can be viewed at an angle, the overlay tracks 4 independent corner points rather than an axis-aligned bounding box. Each frame, the corners of the tracked plane are projected from 3D world space to screen pixels via `Vector3.project(camera)`, so the bracket quad skews correctly at steep viewing angles.
+
+A separate unscaled `THREE.Object3D` is used for corner tracking — `detail.scaledWidth` / `detail.scaledHeight` from 8th Wall already incorporate scale, so keeping the object at `scale(1,1,1)` avoids double-applying it.
+
+## Project structure
 
 ```
-
+src/
+  app.js          — XR8 config + full overlay state machine
+  index.html      — A-Frame scene + overlay markup + styles
+  assets/
+    image_thumbnail.png   — shown in the status bar while searching
+    transparent.png       — hologram texture (original sticker content)
+image-targets/
+  image.json      — target metadata (PLANAR, auto-loaded)
+  image_target.png
+config/
+  webpack.config.js
 ```
 
-5. Animate the plane's rotation, apply a holographic shader.
+## Setup
 
-```
-<script src="https://unpkg.com/aframe-hologram-shader"></script>
-```
+Requires Node/npm. Install with [nvm](https://github.com/nvm-sh/nvm) or [nodejs.org](https://nodejs.org/en/download).
 
-```
-<xrextras-named-image-target name="image">
-  <!-- black circle to cover up the real pin -->
-  <a-circle color="black" radius="0.46"></a-circle>
-
-  <!-- transparent design -->
-  <a-plane src="#img"
-    material="transparent: true; shader: hologram; numGlitchBars: 20"
-    position="0 0 0.5"
-    animation__spin="property: rotation; from: 0 0 0; to: 0 0 360; loop: true; easing: linear; dur: 10000"
-  ></a-plane>
-</xrextras-named-image-target>
+```bash
+npm install
 ```
 
-### Try the experience yourself
+## Development
 
-![image target design](./src/assets/demo.png)
-
-## What I learned
-
-- pins should be matte, the reflections caused issues with tracking
-- use black on white, the contrast of the green was not enough
-- "it worked once and that was enough"
-
----
-
-### Your Exported Project
-This zip contains your project source code, assets, image targets, and configuration needed to build and publish your 8th Wall project. It does not connect to any 8th Wall services, so will work even after the 8th Wall servers are shut down.
-
-### Setup
-If node/npm are not installed, install using https://github.com/nvm-sh/nvm or https://nodejs.org/en/download.
-
-Run `npm install` in this folder.
-
-### Development
-Run `npm run serve` to run the development server.
-
-#### Testing on Mobile
-To test your project on mobile devices, especially for AR experiences that require camera access, you'll need to serve your development server over HTTPS. We recommend using [ngrok](https://ngrok.com/) to create a secure tunnel to your local server. After setting up ngrok, add the following configuration to `config/webpack.config.js` under the `devServer` section:
-
-```javascript
-devServer: {
-  // ... existing config
-  allowedHosts: ['.ngrok-free.dev']
-}
+```bash
+npm run serve
 ```
 
-### Publishing
-Run `npm run build` to generate a production build. The resulting build will be in `dist/`. You can host this bundle on any web server you want.
+### Testing on mobile
 
-### Project Overview
-- `src/`: Contains all your original project code and assets.
-    - References to asset bundles will need to be updated. Asset bundles are now plain folders. For example,
-      - GLTF bundles need to be updated to the `.gltf` file in the folder, i.e., if your model is at `assets/mymodel.gltf/`, update your code to reference `assets/mymodel.gltf/mymodel_file.gltf`.
-- `image-targets/`: Contains your project's image targets (if any).
-  - The image target with the `_target` suffix is the image target loaded by the engine. The others are used for various display purposes, but are exported for your convenience.
-  - To enable image targets, call this in `app.js` or `app.ts` file. (Note: `app.js` or `app.ts` may not be created by default; you will need to create this file yourself.) The autoload targets will have a `"loadAutomatically": true` property in their json file.
-```javascript
-const onxrloaded = () => {
-  XR8.XrController.configure({
-    imageTargetData: [
-      require('../image-targets/target1.json'),
-      require('../image-targets/target2.json'),
-    ],
-  })
-}
-window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded)
+AR camera access requires HTTPS. Use [ngrok](https://ngrok.com/) to tunnel to localhost — the dev server already allows `.ngrok-free.dev` hosts.
+
+## Build
+
+```bash
+npm run build
 ```
-- `config/`: Contains the necessary webpack configuration and typescript definitions to support project development.
-- `external/`: Contains dependencies used by your project, loaded in `index.html`.
-  - If you are not using the XR Engine, you can remove the xr.js script tag from `index.html` and delete the `external/xr/` folder to save bandwidth.
-  - You can also customize whether `face`, `slam`, or both, are loaded on the `data-preload-chunks` attribute.
 
-### Final Notes
-Please reach out to support@8thwall.com with any questions not yet answered in the docs. Thank you for being part of 8th Wall's story!
+Output goes to `dist/`. Host it anywhere.
+
+## Customizing
+
+**Target name** — change `TARGET_NAME` at the top of `src/app.js`. This controls the status bar text.
+
+**Colors** — `NEUTRAL_COLOR` (searching brackets) and `SUCCESS_COLOR` (locked brackets + scan line) are constants at the top of `src/app.js`.
+
+**Animation timing** — `ANIM_LOCK_MS` (bracket snap), `ANIM_SCAN_MS` (scan line), `ANIM_PULSE_MS` (final bracket pulse), `LOST_DEBOUNCE_MS` (delay before reverting to searching on lost).
+
+**Target image** — replace `image-targets/image_target.png` and upload a new target in the [8th Wall Console](https://www.8thwall.com). Update `image-targets/image.json` and `src/assets/image_thumbnail.png` to match.
+
+**Corner axes** — if the bracket quad is rotated relative to the actual target, the local plane axes don't match expectations. Console-log `detail` on the first `xrimagefound` and swap X/Y in the `targetLocalCorners` block in `src/app.js` if needed.
