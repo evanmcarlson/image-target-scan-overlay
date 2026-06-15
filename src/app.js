@@ -1,3 +1,6 @@
+const imageTarget = require('../image-targets/image.json')
+const ORIGINAL_ASPECT = imageTarget.properties.originalWidth / imageTarget.properties.originalHeight
+
 const TARGET_NAME = 'image'
 const NEUTRAL_COLOR = '#E5E5E5'
 const SUCCESS_COLOR = '#6FCF7C'
@@ -133,7 +136,7 @@ function onFound(detail, sceneEl) {
   trackedObj.quaternion.copy(detail.rotation)
   trackedObj.updateMatrixWorld(true)
 
-  const w = detail.scaledWidth * detail.scale, h = detail.scaledHeight * detail.scale
+  const h = detail.scaledHeight * detail.scale, w = h * ORIGINAL_ASPECT
   targetLocalCorners = {
     tl: new THREE.Vector3(-w / 2,  h / 2, 0),
     tr: new THREE.Vector3( w / 2,  h / 2, 0),
@@ -207,7 +210,7 @@ function setupOverlay(sceneEl) {
     trackedObj.quaternion.copy(detail.rotation)
     trackedObj.updateMatrixWorld(true)
     if (state === 'tracking') {
-      const w = detail.scaledWidth * detail.scale, h = detail.scaledHeight * detail.scale
+      const h = detail.scaledHeight * detail.scale, w = h * ORIGINAL_ASPECT
       targetLocalCorners = {
         tl: new THREE.Vector3(-w / 2,  h / 2, 0),
         tr: new THREE.Vector3( w / 2,  h / 2, 0),
@@ -241,7 +244,7 @@ function setupOverlay(sceneEl) {
 
 const onxrloaded = () => {
   XR8.XrController.configure({
-    imageTargetData: [require('../image-targets/image.json')],
+    imageTargetData: [imageTarget],
   })
 }
 window.XR8 ? onxrloaded() : window.addEventListener('xrloaded', onxrloaded)
