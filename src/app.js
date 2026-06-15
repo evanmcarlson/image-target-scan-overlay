@@ -130,13 +130,11 @@ function onFound(detail, sceneEl) {
   if (state === 'confirmed') return
   if (lostTimer) { clearTimeout(lostTimer); lostTimer = null }
 
-  // Update unscaled tracking object — scaledWidth/scaledHeight already incorporate scale,
-  // so we keep trackedObj at scale 1 to avoid double-applying it in corner offsets.
   trackedObj.position.copy(detail.position)
   trackedObj.quaternion.copy(detail.rotation)
   trackedObj.updateMatrixWorld(true)
 
-  const w = detail.scaledWidth, h = detail.scaledHeight
+  const w = detail.scaledWidth * detail.scale, h = detail.scaledHeight * detail.scale
   targetLocalCorners = {
     tl: new THREE.Vector3(-w / 2,  h / 2, 0),
     tr: new THREE.Vector3( w / 2,  h / 2, 0),
