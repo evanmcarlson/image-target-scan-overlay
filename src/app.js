@@ -263,6 +263,13 @@ function setupOverlay(sceneEl) {
     }, LOST_DEBOUNCE_MS)
   })
 
+  window.addEventListener('resize', () => {
+    if (state === 'searching') {
+      currentCorners = getReticleCorners()
+      renderBrackets(currentCorners)
+    }
+  })
+
   enterSearching()
 }
 
