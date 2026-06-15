@@ -2,21 +2,18 @@ const TARGET_NAME = 'image'
 const NEUTRAL_COLOR = '#E5E5E5'
 const SUCCESS_COLOR = '#6FCF7C'
 const ANIM_LOCK_MS = 450
-const ANIM_SCAN_MS = 800
-const ANIM_PULSE_MS = 350
 const LOST_DEBOUNCE_MS = 400
 
 // --- state ---
-let state = 'searching' // 'searching' | 'locking' | 'scanning' | 'confirmed'
+let state = 'searching' // 'searching' | 'locking' | 'tracking' | 'unlocking'
 let currentCorners = null
-let trackedObj = null       // unscaled THREE.Object3D — position/quaternion only
+let trackedObj = null
 let targetLocalCorners = null
 let lostTimer = null
-let lockAnimId = null
-let scanAnimId = null
+let animId = null
 
 // --- DOM refs (set in setupOverlay) ---
-let bTL, bTR, bBR, bBL, scanLine, statusText
+let bTL, bTR, bBR, bBL, statusText
 
 // ── geometry helpers ─────────────────────────────────────────────────────────
 
@@ -48,6 +45,8 @@ function easeOutBack(t) {
   const c1 = 1.70158, c3 = c1 + 1
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
 }
+
+function easeInQuad(t) { return t * t }
 
 function projectCorner(localVec3, obj3D, camera, canvasRect) {
   const world = localVec3.clone().applyMatrix4(obj3D.matrixWorld)
@@ -114,20 +113,20 @@ function playChime() {
 
 // ── state transitions ─────────────────────────────────────────────────────────
 
+function cancelAnim() {
+  if (animId) { cancelAnimationFrame(animId); animId = null }
+}
+
 function enterSearching() {
-  if (lockAnimId) { cancelAnimationFrame(lockAnimId); lockAnimId = null }
-  if (scanAnimId) { cancelAnimationFrame(scanAnimId); scanAnimId = null }
   state = 'searching'
   setBracketColor(NEUTRAL_COLOR)
   setSvgBreathing(true)
-  scanLine.style.display = 'none'
   statusText.textContent = `Looking for ${TARGET_NAME}`
   currentCorners = getReticleCorners()
   renderBrackets(currentCorners)
 }
 
 function onFound(detail, sceneEl) {
-  if (state === 'confirmed') return
   if (lostTimer) { clearTimeout(lostTimer); lostTimer = null }
 
   trackedObj.position.copy(detail.position)
@@ -148,82 +147,42 @@ function onFound(detail, sceneEl) {
   if (navigator.vibrate) navigator.vibrate(10)
   playChime()
 
+  cancelAnim()
   setSvgBreathing(false)
   setBracketColor(SUCCESS_COLOR)
   state = 'locking'
 
   const from = currentCorners || getReticleCorners()
-  animateLock(from, projected, () => {
-    currentCorners = projected
-    runScanLine(projected, () => {
-      pulseBrackets(projected)
-    })
+  animate(from, projected, easeOutBack, () => {
+    state = 'tracking'
+    statusText.innerHTML = `Found &#10003; ${TARGET_NAME}`
   })
 }
 
-function animateLock(from, to, onComplete) {
+function onLost() {
+  cancelAnim()
+  setBracketColor(NEUTRAL_COLOR)
+  state = 'unlocking'
+
+  animate(currentCorners, getReticleCorners(), easeInQuad, () => {
+    enterSearching()
+  })
+}
+
+function animate(from, to, easeFn, onComplete) {
   const start = performance.now()
-  if (lockAnimId) cancelAnimationFrame(lockAnimId)
   function step(now) {
     const t = Math.min((now - start) / ANIM_LOCK_MS, 1)
-    currentCorners = lerpCorners(from, to, easeOutBack(t))
+    currentCorners = lerpCorners(from, to, easeFn(t))
     renderBrackets(currentCorners)
     if (t < 1) {
-      lockAnimId = requestAnimationFrame(step)
+      animId = requestAnimationFrame(step)
     } else {
-      lockAnimId = null
+      animId = null
       onComplete()
     }
   }
-  lockAnimId = requestAnimationFrame(step)
-}
-
-function runScanLine(lockedCorners, onComplete) {
-  state = 'scanning'
-  scanLine.style.display = ''
-  const start = performance.now()
-  if (scanAnimId) cancelAnimationFrame(scanAnimId)
-  function step(now) {
-    const t = Math.min((now - start) / ANIM_SCAN_MS, 1)
-    const left = lerpPt(lockedCorners.tl, lockedCorners.bl, t)
-    const right = lerpPt(lockedCorners.tr, lockedCorners.br, t)
-    scanLine.setAttribute('x1', left.x)
-    scanLine.setAttribute('y1', left.y)
-    scanLine.setAttribute('x2', right.x)
-    scanLine.setAttribute('y2', right.y)
-    if (t < 1) {
-      scanAnimId = requestAnimationFrame(step)
-    } else {
-      scanAnimId = null
-      scanLine.style.display = 'none'
-      onComplete()
-    }
-  }
-  scanAnimId = requestAnimationFrame(step)
-}
-
-function pulseBrackets(lockedCorners) {
-  statusText.innerHTML = `Found &#10003; ${TARGET_NAME}`
-  const cx = (lockedCorners.tl.x + lockedCorners.tr.x + lockedCorners.br.x + lockedCorners.bl.x) / 4
-  const cy = (lockedCorners.tl.y + lockedCorners.tr.y + lockedCorners.br.y + lockedCorners.bl.y) / 4
-  const start = performance.now()
-  function step(now) {
-    const t = Math.min((now - start) / ANIM_PULSE_MS, 1)
-    const s = 1 + 0.06 * Math.sin(t * Math.PI)
-    renderBrackets({
-      tl: { x: cx + (lockedCorners.tl.x - cx) * s, y: cy + (lockedCorners.tl.y - cy) * s },
-      tr: { x: cx + (lockedCorners.tr.x - cx) * s, y: cy + (lockedCorners.tr.y - cy) * s },
-      br: { x: cx + (lockedCorners.br.x - cx) * s, y: cy + (lockedCorners.br.y - cy) * s },
-      bl: { x: cx + (lockedCorners.bl.x - cx) * s, y: cy + (lockedCorners.bl.y - cy) * s },
-    })
-    if (t < 1) {
-      requestAnimationFrame(step)
-    } else {
-      state = 'confirmed'
-      renderBrackets(lockedCorners)
-    }
-  }
-  requestAnimationFrame(step)
+  animId = requestAnimationFrame(step)
 }
 
 // ── scene wiring ──────────────────────────────────────────────────────────────
@@ -233,31 +192,38 @@ function setupOverlay(sceneEl) {
   bTR = document.getElementById('bracket-tr')
   bBR = document.getElementById('bracket-br')
   bBL = document.getElementById('bracket-bl')
-  scanLine = document.getElementById('scan-line')
   statusText = document.getElementById('scan-status-text')
 
-  // Unscaled Object3D for corner projection — added to scene so matrixWorld updates each frame
   trackedObj = new THREE.Object3D()
   sceneEl.object3D.add(trackedObj)
 
   sceneEl.addEventListener('xrimagefound', ({ detail }) => {
-    console.log('[scan] xrimagefound', detail) // first-time sanity check
+    console.log('[scan] xrimagefound', detail)
     onFound(detail, sceneEl)
   })
 
   sceneEl.addEventListener('xrimageupdated', ({ detail }) => {
-    if (state === 'confirmed') return
     trackedObj.position.copy(detail.position)
     trackedObj.quaternion.copy(detail.rotation)
     trackedObj.updateMatrixWorld(true)
+    if (state === 'tracking') {
+      const w = detail.scaledWidth * detail.scale, h = detail.scaledHeight * detail.scale
+      targetLocalCorners = {
+        tl: new THREE.Vector3(-w / 2,  h / 2, 0),
+        tr: new THREE.Vector3( w / 2,  h / 2, 0),
+        br: new THREE.Vector3( w / 2, -h / 2, 0),
+        bl: new THREE.Vector3(-w / 2, -h / 2, 0),
+      }
+      const projected = computeProjectedCorners(sceneEl)
+      if (projected) { currentCorners = projected; renderBrackets(currentCorners) }
+    }
   })
 
   sceneEl.addEventListener('xrimagelost', () => {
-    if (state === 'confirmed') return
     if (lostTimer) clearTimeout(lostTimer)
     lostTimer = setTimeout(() => {
       lostTimer = null
-      if (state !== 'confirmed') enterSearching()
+      onLost()
     }, LOST_DEBOUNCE_MS)
   })
 
